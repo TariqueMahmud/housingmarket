@@ -1,0 +1,112 @@
+# Loading packages
+library(changepoint)
+library(bcp)
+library(strucchange)
+library(segmented)
+library(tree)
+
+library(tseries)
+library(rugarch)
+library(FinTS)
+library(e1071)
+library(plyr)
+library(xts)
+library(zoo)
+library(magrittr)
+
+
+
+# data(Nile)
+# is.numeric(data)
+# str(Nile)
+# plot(df)
+
+# cpt.mean(df, method = "AMOC")
+# 
+# cpt.mean(df, method = "PELT", Q= 10)
+
+setwd("C:/All Files/TRU Study")
+df1<- read.csv("greater_vancouver1.csv", stringsAsFactors = FALSE)
+#Replace the column names
+names(df1)[1]<-paste("m")
+names(df1)[2]<-paste("p")
+df1
+
+
+df1
+df1->df
+
+#char to date
+df %<>%
+  mutate(m= as.Date(m, format= "%d/%m/%Y"))
+print(class(df$m))
+df
+
+plot(df)
+
+####### 1 #########
+#Checking stationary with ADF
+
+ht <- lapply(df, adf.test, alternative="stationary", k=11)
+ht #data is not stationary
+
+##for the price
+#Since the p-value is not less than 0.05, we fail to reject the null hypothesis.
+#This means the time series is non-stationary. In other words, it has some time-dependent structure and does not have constant variance over time.
+
+
+#Converting to stationary
+
+dfs <- diff(log(df$p))
+dfs
+
+adf.test(dfs, k=11)
+#Now the data is stationary
+
+######## 2 #########
+#Checking the volatility clustering
+
+plot.ts(dfs)
+
+#According to the plot, the large changes are following by large changes and smaller are following small ones.
+#So volatility clustering exists
+
+####### 3 #########
+#Checking ARCH effect is there or not in the data
+
+ArchTest(dfs)
+#accept the null hypothesis, as p value is greater than 0.05
+
+garch(dfs, grad="numerical", trace = FALSE)
+
+dfs_garch = ugarchspec(variance.model = list(garchOrder=c(1,1)),mean.model = list(armaOrder=c(1,1)))
+dfs_garch
+
+dfs_garch_fit = ugarchfit(dfs_garch,data = dfs)
+dfs_garch_fit
+
+
+
+##### 5 #####
+#ploting the garch
+
+p_garch = newsimpact(dfs_garch_fit)
+p_garch
+
+
+plot(p_garch$zx, p_garch$zy, 
+     ylab=p_garch$yexpr, 
+     main = "garch impact plot")
+
+
+##### 6 #####
+#forecasting the volatility of 1 year
+
+dfs_f=ugarchforecast(dfs_garch_fit, n.ahead=365)
+dfs_f
+
+
+################################################
+
+
+plot(dfs_garch_fit)
